@@ -20,7 +20,12 @@ from google.genai import types
 
 from weather_agent.weather_tool import WeatherLookupError, get_weather
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+# "-latest" is a rolling alias to Google's current recommended flash model.
+# Pinned version names (e.g. "gemini-2.5-flash") can 404 for new API keys
+# once Google moves the default rollout to a newer model, even while the
+# pinned name still shows up in models.list() -- happened while building
+# this. The alias avoids re-diagnosing that every time Google reshuffles.
+DEFAULT_MODEL = "gemini-flash-latest"
 
 GET_WEATHER_DECLARATION = types.FunctionDeclaration(
     name="get_weather",
@@ -61,8 +66,13 @@ class WeatherAgent:
     """A Gemini chat session pre-configured with the get_weather tool."""
 
     def __init__(self, api_key: str, model: str = DEFAULT_MODEL) -> None:
-        client = genai.Client(api_key=api_key)
-        self._chat = client.chats.create(
+        # Keep a reference to the Client, not just the Chat it creates: the
+        # Client owns the underlying httpx connection and closes it in
+        # __del__ once garbage collected, so a local-only `client` here
+        # would get GC'd right after __init__ returns and close the
+        # connection out from under every later send_message() call.
+        self._client = genai.Client(api_key=api_key)
+        self._chat = self._client.chats.create(
             model=model,
             config=types.GenerateContentConfig(
                 tools=[WEATHER_TOOL],

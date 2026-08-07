@@ -10,6 +10,14 @@ import sys
 
 from dotenv import load_dotenv
 
+# Windows consoles often default stdout to a legacy codepage (cp1252) that
+# can't encode "°", turning Gemini's replies into mojibake (e.g. "27.7°C"
+# -> "27.7?C"). Force UTF-8 on stdout/stderr; harmless on platforms that are
+# already UTF-8.
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 from weather_agent.agent import DEFAULT_MODEL, WeatherAgent
 
 
